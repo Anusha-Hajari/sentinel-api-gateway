@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelAPI | AI Threat Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Chart.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="logo-area">
+            <div class="shield-icon">🛡️</div>
+            <div>
+                <h1>SentinelAPI Gateway</h1>
+                <p class="subtitle">AI-Powered Threat Monitoring & Incident Response</p>
+            </div>
+        </div>
+        <div class="status-badge">
+            <span class="pulsing-dot"></span>
+            <span id="connection-status">Connecting to Gateway...</span>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+                <!-- 1. METRICS CARDS -->
+        <section class="metrics-grid">
+            <div class="card metric-card">
+                <h3>Total Inspected</h3>
+                <div class="metric-value text-purple" id="metric-total">0</div>
+                <div class="metric-sub">All Inbound Requests</div>
+            </div>
+            <div class="card metric-card">
+                <h3>Threats Blocked</h3>
+                <div class="metric-value text-red" id="metric-blocked">0</div>
+                <div class="metric-sub">CSIC 2010 AI Interceptions</div>
+            </div>
+            <div class="card metric-card">
+                <h3>Legitimate Allowed</h3>
+                <div class="metric-value text-green" id="metric-allowed">0</div>
+                <div class="metric-sub">Clean Traffic Passed</div>
+            </div>
+            <div class="card metric-card">
+                <h3>Avg Inspection Latency</h3>
+                <div class="metric-value text-blue" id="metric-latency">&lt; 5 ms</div>
+                <div class="metric-sub">ROC-AUC: 0.9951</div>
+            </div>
+        </section>
+        
+
+        <!-- 2. CHARTS & TEST CONSOLE -->
+        <section class="charts-grid">
+            <div class="card chart-card">
+                <h3>Threat Distribution Breakdown</h3>
+                <div class="chart-wrapper">
+                    <canvas id="threatBreakdownChart"></canvas>
+                </div>
+            </div>
+            <div class="card chart-card">
+                <h3>Interactive Attack Simulator (Live Test)</h3>
+                <p class="card-desc">Send test queries to the protected API and watch SentinelAPI intercept them:</p>
+                <div class="sim-form">
+                    <label>Test Payload or Query Parameter:</label>
+                    <input type="text" id="sim-payload" value="' OR '1'='1" placeholder="Enter test string...">
+                    <div class="sim-buttons">
+                        <button class="btn btn-attack" onclick="sendSimulatedRequest(true)">🚨 Fire Attack Request</button>
+                        <button class="btn btn-clean" onclick="sendSimulatedRequest(false)">✅ Send Clean Request</button>
+                    </div>
+                    <div class="sim-result" id="sim-result-box">Ready for test request...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. LIVE INCIDENT STREAM TABLE -->
+        <section class="card table-card">
+            <div class="table-header">
+                <h3>Live Security Incident Feed (WebSocket Stream)</h3>
+                <span class="live-tag">LIVE FEED</span>
+            </div>
+            <div class="table-responsive">
+                <table class="incident-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Client IP</th>
+                            <th>Target Endpoint</th>
+                            <th>Threat Category</th>
+                            <th>Confidence</th>
+                            <th>Payload Sample</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incident-tbody">
+                        <tr>
+                            <td colspan="7" class="empty-state">Waiting for incoming traffic...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

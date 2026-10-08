@@ -1,0 +1,23 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large Raw Dataset Dumps (can be re-downloaded/parsed)
+dataset/raw/
+dataset/payloads.csv
+
+# Database & SQLite files
+*.db
+*.sqlite3
+sentinel_security.db
+
+# OS / Editor files
+.vscode/
+.DS_Store
+Thumbs.db
