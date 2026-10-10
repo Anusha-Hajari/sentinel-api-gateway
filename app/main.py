@@ -8,11 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, SecurityIncident, BlockedIP, SessionLocal
 from app.detector import detector
+from app.bola_detector import bola_detector
 
 app = FastAPI(
     title="SentinelAPI AI Security Gateway",
-    description="Real-Time Machine Learning API Threat Monitoring System",
-    version="1.0.0"
+    description="Real-Time Machine Learning & BOLA API Threat Monitoring System",
+    version="1.1.0"
 )
 
 app.add_middleware(
@@ -48,7 +49,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# --- REAL-TIME SECURITY INSPECTION & LOGGING MIDDLEWARE ---
+# --- REAL-TIME DUAL-LAYER SECURITY INSPECTION MIDDLEWARE ---
 @app.middleware("http")
 async def security_guard_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "unknown"
@@ -91,23 +92,42 @@ async def security_guard_middleware(request: Request, call_next):
 
     target_content = f"{query_params_values} {body_text}".strip()
 
-    # 3. AI Threat Inspection
-    result = detector.analyze(target_content)
+    # -------------------------------------------------------------
+    # LAYER A: AI / ML Payload Inspection (SQLi, XSS, Cmd, Anomaly)
+    # -------------------------------------------------------------
+    ml_result = detector.analyze(target_content)
 
-    # 4. Prepare incident record
-    action = "BLOCKED" if result["is_threat"] else "ALLOWED"
+    # -------------------------------------------------------------
+    # LAYER B: Context-Aware Authorization & BOLA/IDOR Inspection
+    # -------------------------------------------------------------
+    bola_result = bola_detector.inspect(request)
+
+    # Final Decision Fusion
+    is_threat = ml_result["is_threat"] or bola_result["is_threat"]
+    
+    if bola_result["is_threat"]:
+        threat_type = bola_result["threat_type"]
+        confidence = bola_result["confidence"]
+        payload_logged = f"Path: {path} | {bola_result.get('detail', '')}"
+    else:
+        threat_type = ml_result["threat_type"]
+        confidence = ml_result["confidence"]
+        payload_logged = target_content[:300] if target_content else "(empty parameter)"
+
+    action = "BLOCKED" if is_threat else "ALLOWED"
+
+    # 3. Log to PostgreSQL
     incident_data = {
         "client_ip": client_ip,
         "method": request.method,
         "path": path,
-        "attack_type": result["threat_type"],
-        "confidence": result["confidence"],
-        "anomaly_score": result["anomaly_score"],
-        "payload_sample": target_content[:300] if target_content else "(empty parameter)",
+        "attack_type": threat_type if is_threat else "Benign",
+        "confidence": confidence,
+        "anomaly_score": ml_result.get("anomaly_score", 0.0),
+        "payload_sample": payload_logged,
         "action_taken": action
     }
 
-    # Save to PostgreSQL
     db = SessionLocal()
     try:
         incident = SecurityIncident(**incident_data)
@@ -117,30 +137,30 @@ async def security_guard_middleware(request: Request, call_next):
     finally:
         db.close()
 
-    # Broadcast to live dashboard via WebSocket
+    # 4. Broadcast to live dashboard via WebSocket
     await manager.broadcast({
         "event": "TRAFFIC_EVENT",
         "id": incident_id,
         **incident_data,
-        "latency_ms": result["latency_ms"]
+        "latency_ms": ml_result["latency_ms"]
     })
 
-    # 5. If Threat: Block with 403
-    if result["is_threat"]:
+    # 5. If Threat: Block immediately with 403 Forbidden
+    if is_threat:
         return JSONResponse(
             status_code=403,
             content={
                 "status": "BLOCKED",
-                "error": "Malicious activity intercepted by SentinelAPI AI Gateway",
-                "threat_type": result["threat_type"],
-                "confidence": f"{result['confidence'] * 100:.1f}%",
-                "inspection_latency": f"{result['latency_ms']} ms"
+                "error": "Access Denied by SentinelAPI AI Security Gateway",
+                "threat_type": threat_type,
+                "confidence": f"{confidence * 100:.1f}%",
+                "inspection_latency": f"{ml_result['latency_ms']} ms"
             }
         )
 
-    # 6. If Clean: Pass through with 200
+    # 6. If Clean: Pass through to protected route
     response = await call_next(request)
-    response.headers["X-Sentinel-Inspection-Time"] = f"{result['latency_ms']}ms"
+    response.headers["X-Sentinel-Inspection-Time"] = f"{ml_result['latency_ms']}ms"
     return response
 
 
@@ -165,7 +185,8 @@ def get_threat_stats(db: Session = Depends(get_db)):
     sqli_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("SQL")).count()
     xss_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("XSS")).count()
     cmd_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("Command")).count()
-    other_attacks = total_blocked - (sqli_count + xss_count + cmd_count)
+    bola_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("BOLA") | SecurityIncident.attack_type.contains("IDOR")).count()
+    other_attacks = total_blocked - (sqli_count + xss_count + cmd_count + bola_count)
 
     recent_incidents = (
         db.query(SecurityIncident)
@@ -182,6 +203,7 @@ def get_threat_stats(db: Session = Depends(get_db)):
             "SQLi": sqli_count,
             "XSS": xss_count,
             "Command_Traversal": cmd_count,
+            "BOLA_IDOR": bola_count,
             "Anomalous_Attack": max(0, other_attacks)
         },
         "recent_incidents": [
@@ -200,7 +222,7 @@ def get_threat_stats(db: Session = Depends(get_db)):
     }
 
 
-# --- SAMPLE PROTECTED BACKEND API ROUTES ---
+# --- PROTECTED SAMPLE ENDPOINTS (With BOLA Resource Models) ---
 @app.get("/api/products")
 def list_products(search: str = ""):
     return {
@@ -209,9 +231,16 @@ def list_products(search: str = ""):
         "data": [{"id": 1, "item": "Gaming Mouse"}, {"id": 2, "item": "Mechanical Keyboard"}]
     }
 
-@app.post("/api/user/profile")
-def update_profile(data: dict):
-    return {"status": "success", "message": "Profile updated!", "received": data}
+@app.get("/api/orders/{order_id}")
+def get_order_details(order_id: str):
+    # If request reached here, BOLA detector confirmed ownership!
+    return {
+        "status": "success",
+        "order_id": order_id,
+        "item": "Premium Laptop Stand",
+        "total_amount": "$49.99",
+        "status": "Shipped"
+    }
 
 @app.get("/health")
 def health_check():

@@ -54,11 +54,11 @@ python -m venv venv
 source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-2. Train the Models
+### 2. Train the Models
 bash
 python dataset/parse_csic.py
 python ml_engine/train.py
-3. Start the Security Gateway
+### 3. Start the Security Gateway
 bash
 uvicorn app.main:app --reload
 
