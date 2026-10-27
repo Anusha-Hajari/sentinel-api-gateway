@@ -5,10 +5,16 @@ function initChart() {
     breakdownChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['SQL Injection', 'Cross-Site Scripting (XSS)', 'Command / Traversal', 'BOLA / IDOR Violation', 'CSIC Anomalous'],
+            // Strictly 4 genuine attack categories (No BOLA/IDOR)
+            labels: [
+                'SQL Injection', 
+                'Cross-Site Scripting (XSS)', 
+                'Command / Traversal', 
+                'CSIC Anomalous'
+            ],
             datasets: [{
-                data: [0, 0, 0, 0, 0],
-                backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#eab308', '#3b82f6'],
+                data: [0, 0, 0, 0],
+                backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#3b82f6'],
                 borderWidth: 2,
                 borderColor: '#111827'
             }]
@@ -17,7 +23,7 @@ function initChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 } } }
+                legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } }
             }
         }
     });
@@ -42,7 +48,6 @@ async function loadStats() {
                 data.breakdown.SQLi || 0,
                 data.breakdown.XSS || 0,
                 data.breakdown.Command_Traversal || 0,
-                data.breakdown.BOLA_IDOR || 0,
                 data.breakdown.Anomalous_Attack || 0
             ];
             breakdownChart.update();
@@ -60,6 +65,8 @@ async function loadStats() {
 
 function prependIncidentRow(inc, isNew = true) {
     const tbody = document.getElementById('incident-tbody');
+    if (!tbody) return;
+
     if (tbody.querySelector('.empty-state')) {
         tbody.innerHTML = '';
     }
@@ -78,7 +85,7 @@ function prependIncidentRow(inc, isNew = true) {
         <td><code>${inc.ip || inc.client_ip}</code></td>
         <td><code>${inc.path}</code></td>
         <td><span class="badge badge-type">${inc.type || inc.attack_type}</span></td>
-        <td><strong>${inc.confidence}</strong></td>
+        <td><strong>${inc.confidence || '100%'}</strong></td>
         <td><span class="code-snippet">${escapeHtml(inc.payload || inc.payload_sample || '')}</span></td>
         <td><span class="badge ${badgeClass}">${actionText}</span></td>
     `;
@@ -91,7 +98,13 @@ function prependIncidentRow(inc, isNew = true) {
 }
 
 function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (!text) return '';
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 function connectWebSocket() {
@@ -100,7 +113,7 @@ function connectWebSocket() {
     const statusEl = document.getElementById('connection-status');
 
     ws.onopen = () => {
-        statusEl.innerText = "Gateway Online (Live)";
+        if (statusEl) statusEl.innerText = "Gateway Online (Live)";
     };
 
     ws.onmessage = (event) => {
@@ -114,7 +127,7 @@ function connectWebSocket() {
                 if (blockedEl) blockedEl.innerText = parseInt(blockedEl.innerText || '0') + 1;
             } else {
                 const allowedEl = document.getElementById('metric-allowed');
-                allowedEl.innerText = parseInt(allowedEl.innerText || '0') + 1;
+                if (allowedEl) allowedEl.innerText = parseInt(allowedEl.innerText || '0') + 1;
             }
 
             if (msg.latency_ms) {
@@ -128,12 +141,11 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
-        statusEl.innerText = "Reconnecting...";
+        if (statusEl) statusEl.innerText = "Reconnecting...";
         setTimeout(connectWebSocket, 3000);
     };
 }
 
-// Interactive Attack Simulator
 async function sendSimulatedRequest(isAttack) {
     const resultBox = document.getElementById('sim-result-box');
     const input = document.getElementById('sim-payload');
@@ -154,32 +166,6 @@ async function sendSimulatedRequest(isAttack) {
             resultBox.innerHTML = `<span style="color: #ef4444;">🚨 <strong>HTTP 403 BLOCKED!</strong> ${data.threat_type} (${data.confidence}) in ${data.inspection_latency}</span>`;
         } else {
             resultBox.innerHTML = `<span style="color: #10b981;">✅ <strong>HTTP 200 ALLOWED!</strong> Benign request passed through.</span>`;
-        }
-    } catch (err) {
-        resultBox.innerText = `Error: ${err}`;
-    }
-}
-
-// BOLA / IDOR Specific Simulator
-async function sendBolaRequest(isAttack) {
-    const resultBox = document.getElementById('sim-result-box');
-    
-    // Alice's Token trying to access:
-    // If attack: Bob's order (201) -> BOLA!
-    // If clean: Alice's own order (101) -> ALLOWED!
-    const orderId = isAttack ? "201" : "101";
-    const headers = { "Authorization": "Bearer token_alice" };
-
-    resultBox.innerText = `[Alice] Requesting: GET /api/orders/${orderId} ...`;
-
-    try {
-        const response = await fetch(`/api/orders/${orderId}`, { headers: headers });
-        const data = await response.json();
-
-        if (response.status === 403) {
-            resultBox.innerHTML = `<span style="color: #eab308;">🚨 <strong>HTTP 403 BOLA BLOCKED!</strong> ${data.threat_type} (${data.confidence})</span>`;
-        } else {
-            resultBox.innerHTML = `<span style="color: #10b981;">✅ <strong>HTTP 200 ALLOWED!</strong> Alice authorized to access Order ${orderId}.</span>`;
         }
     } catch (err) {
         resultBox.innerText = `Error: ${err}`;

@@ -8,11 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db, SecurityIncident, BlockedIP, SessionLocal
 from app.detector import detector
-from app.bola_detector import bola_detector
 
 app = FastAPI(
     title="SentinelAPI AI Security Gateway",
-    description="Real-Time Machine Learning & BOLA API Threat Monitoring System",
+    description="Real-Time Machine Learning API Threat Monitoring System",
     version="1.1.0"
 )
 
@@ -49,13 +48,13 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# --- REAL-TIME DUAL-LAYER SECURITY INSPECTION MIDDLEWARE ---
+# --- REAL-TIME AI SECURITY INSPECTION MIDDLEWARE ---
 @app.middleware("http")
 async def security_guard_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "unknown"
     path = request.url.path
 
-    # Skip internal/static/dashboard endpoints
+    # Skip internal / static / dashboard endpoints
     if (path.startswith("/static") or 
         path.startswith("/docs") or 
         path.startswith("/openapi.json") or 
@@ -80,7 +79,7 @@ async def security_guard_middleware(request: Request, call_next):
     finally:
         db.close()
 
-    # 2. Extract inspection targets: inspect query values and request body
+    # 2. Extract inspection targets: query values and request body
     query_params_values = " ".join([v for _, v in request.query_params.multi_items()])
     body_text = ""
     try:
@@ -93,27 +92,14 @@ async def security_guard_middleware(request: Request, call_next):
     target_content = f"{query_params_values} {body_text}".strip()
 
     # -------------------------------------------------------------
-    # LAYER A: AI / ML Payload Inspection (SQLi, XSS, Cmd, Anomaly)
+    # AI / ML Payload Inspection (SQLi, XSS, Cmd, CSIC Anomaly)
     # -------------------------------------------------------------
     ml_result = detector.analyze(target_content)
 
-    # -------------------------------------------------------------
-    # LAYER B: Context-Aware Authorization & BOLA/IDOR Inspection
-    # -------------------------------------------------------------
-    bola_result = bola_detector.inspect(request)
-
-    # Final Decision Fusion
-    is_threat = ml_result["is_threat"] or bola_result["is_threat"]
-    
-    if bola_result["is_threat"]:
-        threat_type = bola_result["threat_type"]
-        confidence = bola_result["confidence"]
-        payload_logged = f"Path: {path} | {bola_result.get('detail', '')}"
-    else:
-        threat_type = ml_result["threat_type"]
-        confidence = ml_result["confidence"]
-        payload_logged = target_content[:300] if target_content else "(empty parameter)"
-
+    is_threat = ml_result["is_threat"]
+    threat_type = ml_result["threat_type"]
+    confidence = ml_result["confidence"]
+    payload_logged = target_content[:300] if target_content else "(clean request)"
     action = "BLOCKED" if is_threat else "ALLOWED"
 
     # 3. Log to PostgreSQL
@@ -145,7 +131,7 @@ async def security_guard_middleware(request: Request, call_next):
         "latency_ms": ml_result["latency_ms"]
     })
 
-    # 5. If Threat: Block immediately with 403 Forbidden
+    # 5. If Threat: Block immediately with HTTP 403 Forbidden
     if is_threat:
         return JSONResponse(
             status_code=403,
@@ -185,8 +171,7 @@ def get_threat_stats(db: Session = Depends(get_db)):
     sqli_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("SQL")).count()
     xss_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("XSS")).count()
     cmd_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("Command")).count()
-    bola_count = db.query(SecurityIncident).filter(SecurityIncident.attack_type.contains("BOLA") | SecurityIncident.attack_type.contains("IDOR")).count()
-    other_attacks = total_blocked - (sqli_count + xss_count + cmd_count + bola_count)
+    other_attacks = total_blocked - (sqli_count + xss_count + cmd_count)
 
     recent_incidents = (
         db.query(SecurityIncident)
@@ -203,7 +188,6 @@ def get_threat_stats(db: Session = Depends(get_db)):
             "SQLi": sqli_count,
             "XSS": xss_count,
             "Command_Traversal": cmd_count,
-            "BOLA_IDOR": bola_count,
             "Anomalous_Attack": max(0, other_attacks)
         },
         "recent_incidents": [
@@ -222,18 +206,20 @@ def get_threat_stats(db: Session = Depends(get_db)):
     }
 
 
-# --- PROTECTED SAMPLE ENDPOINTS (With BOLA Resource Models) ---
+# --- PROTECTED SAMPLE ENDPOINTS ---
 @app.get("/api/products")
 def list_products(search: str = ""):
     return {
         "status": "success",
         "message": f"Showing products matching '{search}'",
-        "data": [{"id": 1, "item": "Gaming Mouse"}, {"id": 2, "item": "Mechanical Keyboard"}]
+        "data": [
+            {"id": 1, "item": "Gaming Mouse"},
+            {"id": 2, "item": "Mechanical Keyboard"}
+        ]
     }
 
 @app.get("/api/orders/{order_id}")
 def get_order_details(order_id: str):
-    # If request reached here, BOLA detector confirmed ownership!
     return {
         "status": "success",
         "order_id": order_id,

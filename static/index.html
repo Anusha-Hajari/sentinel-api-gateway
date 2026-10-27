@@ -14,7 +14,7 @@
             <div class="shield-icon">🛡️</div>
             <div>
                 <h1>SentinelAPI Gateway</h1>
-                <p class="subtitle">AI-Powered Threat Monitoring & BOLA / IDOR Defense</p>
+                <p class="subtitle">AI-Powered Threat Monitoring & Incident Response</p>
             </div>
         </div>
         <div class="status-badge">
@@ -34,7 +34,7 @@
             <div class="card metric-card">
                 <h3>Threats Blocked</h3>
                 <div class="metric-value text-red" id="metric-blocked">0</div>
-                <div class="metric-sub">ML & BOLA Interceptions</div>
+                <div class="metric-sub">CSIC 2010 AI Interceptions</div>
             </div>
             <div class="card metric-card">
                 <h3>Legitimate Allowed</h3>
@@ -58,23 +58,14 @@
             </div>
             <div class="card chart-card">
                 <h3>Interactive Attack Simulator (Live Test)</h3>
-                <p class="card-desc">Simulate both ML payload injections and BOLA/IDOR authorization attacks:</p>
+                <p class="card-desc">Send test queries to the protected API and watch SentinelAPI intercept them:</p>
                 <div class="sim-form">
                     <label>Test Payload or Query Parameter:</label>
                     <input type="text" id="sim-payload" value="' OR '1'='1" placeholder="Enter test string...">
-                    
-                    <!-- Row 1: Payload Attacks (SQLi / Clean) -->
                     <div class="sim-buttons">
-                        <button class="btn btn-attack" onclick="sendSimulatedRequest(true)">🚨 Fire SQLi Attack</button>
+                        <button class="btn btn-attack" onclick="sendSimulatedRequest(true)">🚨 Fire Attack Request</button>
                         <button class="btn btn-clean" onclick="sendSimulatedRequest(false)">✅ Send Clean Request</button>
                     </div>
-
-                    <!-- Row 2: OWASP API #1 BOLA / IDOR Attacks -->
-                    <div class="sim-buttons" style="margin-top: -6px;">
-                        <button class="btn" style="background-color: #eab308; color: #111827;" onclick="sendBolaRequest(true)">🚨 Fire BOLA Attack (Alice accesses Bob's Order)</button>
-                        <button class="btn" style="background-color: #06b6d4; color: #111827;" onclick="sendBolaRequest(false)">✅ Legitimate Owner Access (Alice owns Order 101)</button>
-                    </div>
-
                     <div class="sim-result" id="sim-result-box">Ready for test request...</div>
                 </div>
             </div>
