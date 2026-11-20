@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import joblib
 import numpy as np
@@ -10,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, IsolationForest
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
 
-# Import feature extractor from current directory
+# Feature extraction function import from features.py
 from features import extract_numerical_features
 
 
@@ -40,8 +39,8 @@ def main():
     )
     print(f"      Training set: {len(X_train):,} requests | Testing set: {len(X_test):,} requests")
 
-    # 3. Supervised Classifier (N-Gram TF-IDF + Random Forest)
-    print("\n[2/4] Training Supervised Classifier (TF-IDF N-grams + Random Forest)...")
+    # 3. Supervised Classifier Pipeline (TF-IDF N-grams + Random Forest)
+    print("\n[2/4] Training Supervised Classifier (TF-IDF + Random Forest)...")
     t0 = time.time()
 
     classifier_pipeline = Pipeline([
@@ -63,7 +62,7 @@ def main():
     train_time = round(time.time() - t0, 2)
     print(f"      Training complete in {train_time} seconds!")
 
-    # 4. Evaluation on 12,213 Unseen Test Requests
+    # 4. Evaluation on Held-Out Test Set
     print("\n[3/4] Evaluating on Unseen CSIC 2010 Test Set (12,213 samples):")
     y_pred = classifier_pipeline.predict(X_test)
     y_proba = classifier_pipeline.predict_proba(X_test)[:, 1]
@@ -81,7 +80,6 @@ def main():
 
     # 5. Unsupervised Anomaly Detection (Isolation Forest)
     print("\n[4/4] Training Unsupervised Anomaly Detector (Isolation Forest)...")
-    # Train on a representative sample of benign baseline traffic
     benign_sample = X_train[y_train == 0].sample(n=min(5000, sum(y_train == 0)), random_state=42)
     benign_features = np.array([extract_numerical_features(p) for p in benign_sample])
 
@@ -100,12 +98,7 @@ def main():
 
     joblib.dump(classifier_pipeline, clf_path)
     joblib.dump(anomaly_model, anom_path)
-
-    print("\n" + "=" * 70)
-    print("[+] Models successfully trained & serialized:")
-    print(f"    - Supervised Model : {clf_path}")
-    print(f"    - Anomaly Detector : {anom_path}")
-    print("=" * 70)
+    print("[+] Models successfully saved into saved_models/")
 
 
 if __name__ == "__main__":
