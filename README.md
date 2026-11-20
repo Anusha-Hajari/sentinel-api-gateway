@@ -1,69 +1,96 @@
-# 🛡️ SentinelAPI: AI-Powered API Security Gateway & Threat Monitoring System
+# SentinelAPI — AI-Powered API Security Gateway
 
-> **A real-time, privacy-preserving Layer 7 API Security Gateway powered by dual-engine machine learning and FastAPI.**
+SentinelAPI is a real-time API security gateway and reverse proxy built to protect RESTful APIs from web attacks like SQL Injection, Cross-Site Scripting (XSS), and zero-day anomalies.
 
-![SentinelAPI Defense](evaluation_charts/confusion_matrix.png)
-
-## 📌 Project Overview
-Modern web applications rely heavily on REST APIs, yet traditional Web Application Firewalls (WAFs) relying on static regex signatures struggle against obfuscation, encodings, and novel zero-day attacks. 
-
-**SentinelAPI** acts as an inline reverse proxy that inspects incoming HTTP request parameters and bodies in real-time, evaluating them through a two-tier machine learning pipeline with **sub-10ms latency** without relying on third-party commercial cloud APIs.
+Using a Dual-Engine Machine Learning approach (Random Forest + Isolation Forest) and Shannon Entropy, it inspects incoming requests and blocks malicious payloads with `HTTP 403 Forbidden` in under 5 milliseconds, before they can reach the backend database.
 
 ---
 
-## 🚀 Key Features
-- **Dual-Engine Threat Detection:**
-  - **Supervised Classifier:** TF-IDF Character N-Grams ($N \in [2, 4]$) + Random Forest Ensemble trained on **61,065 authentic requests** from the CSIC 2010 benchmark.
-  - **Unsupervised Anomaly Detector:** Shannon Entropy calculation + Isolation Forest for zero-day anomaly detection.
-- **Sub-10ms Real-Time Inline Proxying:** FastAPI asynchronous middleware inspecting request parameters and JSON bodies.
-- **PostgreSQL Persistence:** Complete transaction audit logging of both ALLOWED and BLOCKED requests.
-- **Live SOC Dashboard:** Real-time event streaming over **WebSockets**, Chart.js threat distribution donut charts, and an interactive attack simulation console.
-- **Privacy-Preserving & 100% Offline:** Zero external API calls; all models run locally.
+## Key Features
+
+* **Real-Time Reverse Proxy:** Intercepts incoming HTTP requests on port 8000 using FastAPI.
+* **Dual-Engine AI Core:** 
+  * Supervised Random Forest for known attacks (SQLi, XSS, Path Traversal).
+  * Unsupervised Isolation Forest for zero-day and abnormal payloads.
+* **Shannon Entropy Analysis:** Detects obfuscated, Base64, and hex-encoded exploit strings.
+* **Live SOC Dashboard:** Dark-themed web dashboard with live request counters, incident tables, and an in-browser attack simulator.
+* **Database Logging:** Asynchronously saves all security incidents and client IPs into PostgreSQL.
 
 ---
 
-## 📊 Benchmark Results (CSIC 2010 HTTP Dataset)
-Evaluated on **12,213 unseen test requests**:
+## Technologies Used
 
-| Metric | Score |
-| :--- | :--- |
-| **Overall Accuracy** | **97.02%** |
-| **ROC-AUC Score** | **0.9951** |
-| **Precision (Attack Detection)** | **0.98** |
-| **Recall (Attack Detection)** | **0.95** |
-| **Average Inspection Latency** | **< 5 ms** |
+* **Backend & Proxy:** FastAPI, Uvicorn (ASGI)
+* **Machine Learning:** Scikit-Learn, NumPy, Joblib
+* **Database:** PostgreSQL, SQLAlchemy ORM
+* **Frontend:** HTML5, CSS3, JavaScript, WebSockets, Chart.js
+* **Testing:** Wireshark, PowerShell, Python
 
 ---
 
-## 🛠️ Tech Stack
-- **Backend & Gateway:** Python 3.10+, FastAPI, Uvicorn
-- **Machine Learning:** Scikit-learn, Pandas, NumPy, Joblib
-- **Database:** PostgreSQL 18, SQLAlchemy, Psycopg
-- **Frontend / Dashboard:** HTML5, CSS3, JavaScript, Chart.js, WebSockets
-- **Evaluation:** Matplotlib, Seaborn
+## Model Performance & Results
+
+Trained and evaluated on the benchmark **CSIC 2010 HTTP Dataset** (61,065 requests):
+
+* **Accuracy:** 97.02%
+* **Precision:** 98.06%
+* **Recall:** 94.61%
+* **F1-Score:** 0.9630
+* **ROC-AUC:** 0.9951
+* **Average Latency:** < 5 ms
 
 ---
 
-## ⚙️ Installation & Quickstart
+## How to Run the Project
 
-### 1. Clone & Set Up Environment
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/Anusha-Hajari/sentinel-api-gateway.git
+git clone https://github.com/anusha-hajari/sentinel-api-gateway.git
 cd sentinel-api-gateway
+```
+
+### 2. Set Up Virtual Environment & Install Packages
+```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
 
-### 2. Train the Models
-bash
-python dataset/parse_csic.py
-python ml_engine/train.py
-### 3. Start the Security Gateway
-bash
-uvicorn app.main:app --reload
+### 3. Start the Server
+```bash
+python -m uvicorn app.main:app --port 8000 --reload
+```
 
-Open http://127.0.0.1:8000/ to view the live dashboard.
+* **Live Dashboard:** http://127.0.0.1:8000
+* **API Documentation (Swagger):** http://127.0.0.1:8000/docs
 
-4. Run Traffic Simulation
-bash
+---
+
+## How to Test
+
+### 1. Test an Attack (SQL Injection)
+Run this command in PowerShell to see the gateway block the attack:
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/products?search=' OR '1'='1 --" -Method Get
+```
+*Expected Output:* `{"status": "BLOCKED", "threat_type": "SQL Injection (SQLi)", "confidence": "99.0%"}`
+
+### 2. Test Safe Traffic (Clean Request)
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/products?search=laptop" -Method Get
+```
+*Expected Output:* `HTTP 200 OK` (Clean product data returned)
+
+### 3. Automated Test Suite
+To fire automated test requests:
+```bash
 python simulator/attack_sim.py
+```
+
+---
+
+## Author
+
+* **Anusha Hajari**
+* B.Tech Computer Science & Engineering
+* Medi-Caps University, Indore
